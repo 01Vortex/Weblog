@@ -56,8 +56,12 @@
                 <span class="avatar-emoji-small">🤖</span>
               </div>
               <div :class="['message', msg.role === 'user' ? 'user-message' : 'assistant-message']">
-                <div class="message-content" v-html="renderMarkdown(msg.content)"></div>
-                <div class="message-time">{{ formatTime(msg.timestamp) }}</div>
+                <div class="message-content">
+                  <!-- 始终渲染 Markdown，打字中时显示光标 -->
+                  <span v-html="renderMarkdown(msg.content)"></span>
+                  <span v-if="msg.isTyping" class="typing-cursor">▋</span>
+                </div>
+                <div class="message-time" v-if="!msg.isTyping">{{ formatTime(msg.timestamp) }}</div>
               </div>
             </div>
           </transition-group>
@@ -144,6 +148,10 @@ const userInput = ref('')
 // 加载状态
 const isLoading = ref(false)
 
+// 打字机效果相关
+const isTyping = ref(false)
+const currentTypingText = ref('')
+
 // 格式化时间
 const formatTime = (timestamp) => {
   return new Date(timestamp).toLocaleTimeString('zh-CN', {
@@ -158,6 +166,53 @@ const scrollToBottom = async () => {
   if (messagesContainer.value) {
     messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
   }
+}
+
+// 打字机效果函数
+const typeWriter = async (text, callback) => {
+  isTyping.value = true
+  currentTypingText.value = ''
+  
+  // 获取当前消息的索引
+  const messageIndex = messages.length
+  
+  // 先添加一个空消息用于显示打字效果
+  messages.push({
+    role: 'assistant',
+    content: '',
+    timestamp: Date.now(),
+    isTyping: true
+  })
+  
+  await nextTick()
+  await scrollToBottom()
+  
+  // 逐字显示
+  for (let i = 0; i < text.length; i++) {
+    currentTypingText.value += text[i]
+    // 直接更新 messages 数组中的内容，触发响应式更新
+    messages[messageIndex].content = currentTypingText.value
+    
+    // 每隔一定时间显示一个字符
+    await new Promise(resolve => setTimeout(resolve, 30)) // 30ms一个字符
+    
+    // 定期滚动到底部
+    if (i % 3 === 0) {
+      await nextTick()
+      scrollToBottom()
+    }
+  }
+  
+  // 打字完成，等待一小段时间再移除光标
+  await new Promise(resolve => setTimeout(resolve, 200))
+  
+  // 打字完成
+  isTyping.value = false
+  messages[messageIndex].isTyping = false
+  await nextTick()
+  await scrollToBottom()
+  
+  if (callback) callback()
 }
 
 // 发送消息到后端 API
@@ -191,14 +246,13 @@ const sendMessage = async () => {
     })
 
     const data = await response.json()
+    
+    // 隐藏加载状态
+    isLoading.value = false
 
-    // 添加 AI 回复到聊天记录
-    const aiMessage = {
-      role: 'assistant',
-      content: data.answer || '抱歉，我没有理解您的问题。',
-      timestamp: Date.now()
-    }
-    messages.push(aiMessage)
+    // 使用打字机效果显示AI回复
+    const aiResponse = data.answer || '抱歉，我没有理解您的问题。'
+    await typeWriter(aiResponse)
 
     // 如果窗口未展开，显示新消息提醒
     if (!isExpanded.value) {
@@ -206,25 +260,18 @@ const sendMessage = async () => {
     }
   } catch (error) {
     console.error('Error calling AI service:', error)
-    const errorMessage = {
-      role: 'assistant',
-      content: 'AI 服务暂时不可用，请稍后再试。',
-      timestamp: Date.now()
-    }
-    messages.push(errorMessage)
-  } finally {
     isLoading.value = false
-    scrollToBottom()
+    
+    // 错误消息也使用打字机效果
+    await typeWriter('AI 服务暂时不可用，请稍后再试。')
   }
 }
 
 // 初始化欢迎消息
-onMounted(() => {
-  messages.push({
-    role: 'assistant',
-    content: '您好！我是您的AI助手，有什么我可以帮您的吗？',
-    timestamp: Date.now()
-  })
+onMounted(async () => {
+  // 使用打字机效果显示欢迎消息
+  await new Promise(resolve => setTimeout(resolve, 500)) // 延迟500ms再开始打字
+  await typeWriter('您好！我是您的AI助手，有什么我可以帮您的吗？')
 })
 </script>
 
@@ -673,6 +720,24 @@ onMounted(() => {
   30% {
     transform: translateY(-8px);
     opacity: 1;
+  }
+}
+
+/* 打字光标 */
+.typing-cursor {
+  display: inline-block;
+  color: #667eea;
+  animation: cursor-blink 0.8s infinite;
+  font-weight: bold;
+  margin-left: 2px;
+}
+
+@keyframes cursor-blink {
+  0%, 49% {
+    opacity: 1;
+  }
+  50%, 100% {
+    opacity: 0.2;
   }
 }
 
