@@ -76,6 +76,11 @@ const menus = [
         'path': '/admin/comment/list',
     },
     {
+        'name': '留言管理',
+        'icon': 'ChatLineSquare',
+        'path': '/admin/guestbook/list',
+    },
+    {
         'name': '博客设置',
         'icon': 'Setting',
         'path': '/admin/blog/settings',
