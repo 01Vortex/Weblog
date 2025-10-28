@@ -1,64 +1,109 @@
 <!-- src/components/AiAssistant.vue -->
 <template>
   <div class="ai-assistant-container">
-    <!-- 展开/收起按钮 -->
-    <button class="toggle-button" @click="toggleAssistant" v-if="!isExpanded" >
-      <span class="button-text">{{ isExpanded ? '' : '🤖' }}</span>
-      <span class="pulse-dot" v-if="!isExpanded && hasNewMessage"></span>
+    <!-- 展开/收起按钮 - 增强版 -->
+    <button class="toggle-button" @click="toggleAssistant" v-if="!isExpanded">
+      <div class="button-icon">
+        <span class="robot-emoji">🤖</span>
+      </div>
+      <span class="pulse-ring" v-if="hasNewMessage"></span>
+      <span class="status-dot"></span>
     </button>
 
-    <!-- 新增聊天气泡 -->
-    <div class="chat-bubble" v-if="!isExpanded && showBubble">
-      <div class="bubble-content">hi,我是博客助手</div>
-      <div class="bubble-arrow"></div>
-    </div>
-
-    <!-- AI 助手对话窗口 -->
-    <div v-if="isExpanded" class="chat-window">
-      <div class="chat-header">
-        <h3>AI 智能助手</h3>
-        <button class="close-btn" @click="toggleAssistant">×</button>
+    <!-- 聊天气泡 - 增强版 -->
+    <transition name="bubble-fade">
+      <div class="chat-bubble" v-if="!isExpanded && showBubble" @click="toggleAssistant">
+        <div class="bubble-content">
+          <span class="wave-emoji">👋</span>
+          <span class="bubble-text">Hi，我是智能AI助手</span>
+        </div>
+        <button class="bubble-close" @click.stop="showBubble = false">×</button>
+        <div class="bubble-arrow"></div>
       </div>
+    </transition>
 
-      <div class="chat-messages" ref="messagesContainer">
-        <div
-            v-for="(msg, index) in messages"
-            :key="index"
-            :class="['message', msg.role === 'user' ? 'user-message' : 'assistant-message']"
-        >
-          <div class="message-content" v-html="renderMarkdown(msg.content)"></div>
-          <div class="message-time">{{ formatTime(msg.timestamp) }}</div>
+    <!-- AI 助手对话窗口 - 增强版 -->
+    <transition name="window-slide">
+      <div v-if="isExpanded" class="chat-window">
+        <!-- 头部 -->
+        <div class="chat-header">
+          <div class="header-left">
+            <div class="avatar-wrapper">
+              <span class="avatar-emoji">🤖</span>
+              <span class="online-indicator"></span>
+            </div>
+            <div class="header-info">
+              <h3>AI 智能助手</h3>
+              <span class="status-text">在线</span>
+            </div>
+          </div>
+          <button class="close-btn" @click="toggleAssistant" title="关闭">
+            <svg width="20" height="20" viewBox="0 0 20 20">
+              <path fill="currentColor" d="M10 8.586L2.929 1.515 1.515 2.929 8.586 10l-7.071 7.071 1.414 1.414L10 11.414l7.071 7.071 1.414-1.414L11.414 10l7.071-7.071-1.414-1.414L10 8.586z"/>
+            </svg>
+          </button>
         </div>
 
-        <!-- 加载指示器 -->
-        <div v-if="isLoading" class="message assistant-message typing-indicator">
-          <div class="typing">
-            <span></span>
-            <span></span>
-            <span></span>
+        <!-- 消息区域 -->
+        <div class="chat-messages" ref="messagesContainer">
+          <transition-group name="message-list">
+            <div
+              v-for="(msg, index) in messages"
+              :key="index"
+              :class="['message-wrapper', msg.role === 'user' ? 'user-wrapper' : 'assistant-wrapper']"
+            >
+              <div class="message-avatar" v-if="msg.role === 'assistant'">
+                <span class="avatar-emoji-small">🤖</span>
+              </div>
+              <div :class="['message', msg.role === 'user' ? 'user-message' : 'assistant-message']">
+                <div class="message-content" v-html="renderMarkdown(msg.content)"></div>
+                <div class="message-time">{{ formatTime(msg.timestamp) }}</div>
+              </div>
+            </div>
+          </transition-group>
+
+          <!-- 加载指示器 - 增强版 -->
+          <div v-if="isLoading" class="message-wrapper assistant-wrapper typing-wrapper">
+            <div class="message-avatar">
+              <span class="avatar-emoji-small">🤖</span>
+            </div>
+            <div class="message assistant-message typing-indicator">
+              <div class="typing">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 输入区域 - 增强版 -->
+        <div class="input-area">
+          <div class="input-wrapper">
+            <input
+              v-model="userInput"
+              @keyup.enter="sendMessage"
+              placeholder="输入问题，按回车发送..."
+              :disabled="isLoading"
+              class="message-input"
+            />
+            <button
+              @click="sendMessage"
+              :disabled="isLoading || !userInput.trim()"
+              class="send-button"
+              :class="{ 'has-content': userInput.trim() }"
+            >
+              <transition name="icon-fade" mode="out-in">
+                <svg v-if="!isLoading" key="send" width="20" height="20" viewBox="0 0 24 24">
+                  <path fill="currentColor" d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                </svg>
+                <div v-else key="loading" class="loading-spinner"></div>
+              </transition>
+            </button>
           </div>
         </div>
       </div>
-
-      <div class="input-area">
-        <input
-            v-model="userInput"
-            @keyup.enter="sendMessage"
-            placeholder="输入问题，按回车发送..."
-            :disabled="isLoading"
-        />
-        <button
-            @click="sendMessage"
-            :disabled="isLoading || !userInput.trim()"
-            class="send-button"
-        >
-          <svg v-if="!isLoading" width="16" height="16" viewBox="0 0 16 16">
-            <path fill="currentColor" d="M1.426 1.924l12.15 5.293a1 1 0 0 1 0 1.838L1.426 14.076A1 1 0 0 1 0 13.17V2.83A1 1 0 0 1 1.426 1.924z"/>
-          </svg>
-          <div v-else class="loading-spinner"></div>
-        </button>
-      </div>
-    </div>
+    </transition>
   </div>
 </template>
 
@@ -184,230 +229,154 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.message-content :deep(pre) {
-  background-color: #f6f8fa;
-  border-radius: 6px;
-  padding: 12px;
-  overflow-x: auto;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  line-height: 1.4;
-}
-
+/* ============ 基础容器样式 ============ */
 .ai-assistant-container {
   position: fixed;
   bottom: 150px;
   right: 20px;
   z-index: 1000;
-  font-size: 13px; /* 添加全局基础字体大小 */
+  font-size: 13px;
 }
 
+/* ============ 切换按钮样式 ============ */
 .toggle-button {
-  background: linear-gradient(135deg, #409eff, #3685ff);
-  color: white;
-  border: none;
-  padding: 12px 20px;
-  border-radius: 30px;
-  cursor: pointer;
-  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  transition: all 0.3s ease;
   position: relative;
-}
-
-.toggle-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(64, 158, 255, 0.4);
-}
-
-.pulse-dot {
-  width: 10px;
-  height: 10px;
-  background-color: #ff4d4f;
-  border-radius: 50%;
-  animation: pulse 1.5s infinite;
-}
-
-@keyframes pulse {
-  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 77, 79, 0.7); }
-  70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(255, 77, 79, 0); }
-  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 77, 79, 0); }
-}
-
-.chat-window {
-  width: 380px;
-  height: 550px;
-  background: white;
-  border-radius: 16px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-  display: flex;
-  flex-direction: column;
-  margin-top: 12px;
-  overflow: hidden;
-  animation: slideUp 0.3s ease;
-}
-
-@keyframes slideUp {
-  from { transform: translateY(20px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
-
-.chat-header {
-  background: linear-gradient(135deg, #409eff, #3685ff);
-  color: white;
-  padding: 16px 20px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.chat-header h3 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 500;
-}
-
-.close-btn {
-  background: none;
+  width: 60px;
+  height: 60px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   border: none;
-  color: white;
-  font-size: 24px;
+  border-radius: 50%;
   cursor: pointer;
-  width: 30px;
-  height: 30px;
+  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4);
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  transition: background 0.2s;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: visible;
 }
 
-.close-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
+.toggle-button:hover {
+  transform: translateY(-4px) scale(1.05);
+  box-shadow: 0 12px 32px rgba(102, 126, 234, 0.5);
 }
 
-.chat-messages {
-  flex: 1;
-  padding: 20px;
-  overflow-y: auto;
-  background-color: #f8fafc;
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
+.toggle-button:active {
+  transform: translateY(-2px) scale(1.02);
 }
 
-.message {
-  max-width: 80%;
-  padding: 12px 16px;
-  border-radius: 18px;
-  position: relative;
-  animation: fadeIn 0.3s ease;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(5px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.user-message {
-  background: linear-gradient(135deg, #409eff, #3685ff);
-  color: white;
-  margin-left: auto;
-  border-bottom-right-radius: 4px;
-}
-
-.assistant-message {
-  background-color: white;
-  color: #333;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  border-bottom-left-radius: 4px;
-}
-
-.message-content {
-  line-height: 1.5;
-  word-wrap: break-word;
-}
-
-.message-time {
-  font-size: 11px;
-  margin-top: 6px;
-  opacity: 0.7;
-  text-align: right;
-}
-
-.typing-indicator {
-  background-color: white;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  border-bottom-left-radius: 4px;
-  padding: 12px 16px;
-}
-
-.typing {
+.button-icon {
   display: flex;
   align-items: center;
-  height: 17px;
+  justify-content: center;
 }
 
-.typing span {
-  height: 8px;
-  width: 8px;
-  float: left;
-  margin: 0 1px;
-  background-color: #9E9EA1;
-  display: block;
+.robot-emoji {
+  font-size: 32px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+}
+
+/* 状态指示点 */
+.status-dot {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  width: 12px;
+  height: 12px;
+  background: #52c41a;
+  border: 2px solid white;
   border-radius: 50%;
-  opacity: 0.4;
+  animation: breathe 2s ease-in-out infinite;
 }
 
-.typing span:nth-of-type(1) {
-  animation: typing 1s infinite;
+@keyframes breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
 }
 
-.typing span:nth-of-type(2) {
-  animation: typing 1s infinite 0.2s;
+/* 脉冲环 */
+.pulse-ring {
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  right: -4px;
+  bottom: -4px;
+  border: 3px solid #ff4d4f;
+  border-radius: 50%;
+  animation: pulse-ring 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-.typing span:nth-of-type(3) {
-  animation: typing 1s infinite 0.4s;
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  70% {
+    transform: scale(1.1);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(0.95);
+    opacity: 0;
+  }
 }
 
-@keyframes typing {
-  0% { transform: translateY(0px); }
-  50% { transform: translateY(-5px); }
-  100% { transform: translateY(0px); }
-}
-
-.input-area {
-  display: flex;
-  padding: 15px;
-  border-top: 1px solid #eee;
+/* ============ 聊天气泡样式 ============ */
+.chat-bubble {
+  position: absolute;
+  bottom: 70px;
+  right: 0;
   background: white;
+  border-radius: 16px;
+  padding: 16px 20px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  z-index: 1001;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 1px solid rgba(102, 126, 234, 0.1);
+  max-width: 260px;
 }
 
-.input-area input {
-  flex: 1;
-  padding: 12px 16px;
-  border: 1px solid #ddd;
-  border-radius: 24px;
-  margin-right: 10px;
-  outline: none;
-  transition: border-color 0.2s;
+.chat-bubble:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
 }
 
-.input-area input:focus {
-  border-color: #409eff;
-  box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.2);
+.bubble-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-.send-button {
-  background: linear-gradient(135deg, #409eff, #3685ff);
+.bubble-text {
+  font-size: 14px;
+  color: #333;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.wave-emoji {
+  font-size: 18px;
+  animation: wave 0.6s ease-in-out infinite;
+}
+
+@keyframes wave {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-15deg); }
+  75% { transform: rotate(15deg); }
+}
+
+.bubble-close {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 20px;
+  height: 20px;
+  background: #ff4d4f;
   color: white;
-  border: none;
-  width: 40px;
-  height: 40px;
+  border: 2px solid white;
   border-radius: 50%;
+  font-size: 12px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -415,58 +384,465 @@ onMounted(() => {
   transition: all 0.2s;
 }
 
+.bubble-close:hover {
+  transform: scale(1.1);
+  background: #ff7875;
+}
+
+.bubble-arrow {
+  position: absolute;
+  bottom: -8px;
+  right: 24px;
+  width: 0;
+  height: 0;
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-top: 10px solid white;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.08));
+}
+
+/* ============ 聊天窗口样式 ============ */
+.chat-window {
+  width: 400px;
+  height: 600px;
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+/* 头部样式 */
+.chat-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 18px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.avatar-wrapper {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(10px);
+}
+
+.avatar-emoji {
+  font-size: 28px;
+}
+
+.online-indicator {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  background: #52c41a;
+  border: 2px solid white;
+  border-radius: 50%;
+  animation: breathe 2s ease-in-out infinite;
+}
+
+.header-info h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.status-text {
+  font-size: 12px;
+  opacity: 0.9;
+  font-weight: 400;
+}
+
+.close-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  backdrop-filter: blur(10px);
+}
+
+.close-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: rotate(90deg);
+}
+
+/* ============ 消息区域样式 ============ */
+.chat-messages {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+  background: linear-gradient(to bottom, #f8f9fa 0%, #ffffff 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.chat-messages::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chat-messages::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-messages::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+}
+
+.chat-messages::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* 消息包装器 */
+.message-wrapper {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.user-wrapper {
+  flex-direction: row-reverse;
+}
+
+.assistant-wrapper {
+  flex-direction: row;
+}
+
+.message-avatar {
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.avatar-emoji-small {
+  font-size: 20px;
+}
+
+/* 消息气泡 */
+.message {
+  max-width: 75%;
+  padding: 12px 16px;
+  border-radius: 16px;
+  position: relative;
+  word-wrap: break-word;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.user-message {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-bottom-right-radius: 4px;
+}
+
+.assistant-message {
+  background: white;
+  color: #333;
+  border-bottom-left-radius: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.message-content {
+  line-height: 1.6;
+  word-wrap: break-word;
+}
+
+/* Markdown 样式 */
+.message-content :deep(p) {
+  margin: 0 0 8px 0;
+}
+
+.message-content :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+.message-content :deep(code) {
+  background: rgba(0, 0, 0, 0.05);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
+  font-family: 'Courier New', monospace;
+}
+
+.user-message .message-content :deep(code) {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.message-content :deep(pre) {
+  background: #f6f8fa;
+  border-radius: 8px;
+  padding: 12px;
+  overflow-x: auto;
+  margin: 8px 0;
+  border: 1px solid #e1e4e8;
+}
+
+.message-content :deep(pre code) {
+  background: none;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.message-content :deep(ul),
+.message-content :deep(ol) {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+
+.message-content :deep(li) {
+  margin: 4px 0;
+}
+
+.message-time {
+  font-size: 10px;
+  margin-top: 6px;
+  opacity: 0.6;
+  text-align: right;
+}
+
+/* 打字指示器 */
+.typing-indicator {
+  min-width: 60px;
+}
+
+.typing {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+}
+
+.typing span {
+  width: 8px;
+  height: 8px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 50%;
+  animation: typing-bounce 1.4s infinite ease-in-out;
+}
+
+.typing span:nth-of-type(1) {
+  animation-delay: 0s;
+}
+
+.typing span:nth-of-type(2) {
+  animation-delay: 0.2s;
+}
+
+.typing span:nth-of-type(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes typing-bounce {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.7;
+  }
+  30% {
+    transform: translateY(-8px);
+    opacity: 1;
+  }
+}
+
+/* ============ 输入区域样式 ============ */
+.input-area {
+  padding: 16px 20px;
+  background: white;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #f5f7fa;
+  border-radius: 24px;
+  padding: 4px 4px 4px 16px;
+  transition: all 0.3s;
+  border: 2px solid transparent;
+}
+
+.input-wrapper:focus-within {
+  background: white;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.message-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 14px;
+  padding: 8px 0;
+  color: #333;
+}
+
+.message-input::placeholder {
+  color: #999;
+}
+
+.send-button {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: #e8e8e8;
+  color: #999;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
+}
+
+.send-button.has-content:not(:disabled) {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
 .send-button:hover:not(:disabled) {
   transform: scale(1.05);
-  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3);
+}
+
+.send-button:active:not(:disabled) {
+  transform: scale(0.95);
 }
 
 .send-button:disabled {
-  background: #a0cfff;
   cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .loading-spinner {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   border: 2px solid transparent;
-  border-top-color: white;
+  border-top-color: currentColor;
   border-radius: 50%;
-  animation: spin 1s linear infinite;
+  animation: spin 0.8s linear infinite;
 }
 
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
 
-/* 新增聊天气泡样式 */
-.chat-bubble {
-  position: absolute;
-  bottom: 60px;
-  right: 0;
-  background: white;
-  border-radius: 18px;
-  padding: 12px 16px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  animation: fadeIn 0.3s ease;
-  white-space: nowrap;
-  /* 添加以下样式使气泡更明显 */
-  z-index: 1001;
+/* ============ 过渡动画 ============ */
+.bubble-fade-enter-active,
+.bubble-fade-leave-active {
+  transition: all 0.3s ease;
 }
 
-.bubble-content {
-  font-size: 14px;
-  color: #333;
+.bubble-fade-enter-from {
+  opacity: 0;
+  transform: translateY(10px) scale(0.9);
 }
 
-.bubble-arrow {
-  position: absolute;
-  bottom: -6px;
-  right: 30px;
-  width: 0;
-  height: 0;
-  border-left: 8px solid transparent;
-  border-right: 8px solid transparent;
-  border-top: 8px solid white;
+.bubble-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-10px) scale(0.9);
 }
 
+.window-slide-enter-active {
+  animation: window-slide-in 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.window-slide-leave-active {
+  animation: window-slide-out 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes window-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes window-slide-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+}
+
+.message-list-enter-active {
+  animation: message-enter 0.3s ease;
+}
+
+@keyframes message-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.icon-fade-enter-active,
+.icon-fade-leave-active {
+  transition: all 0.2s ease;
+}
+
+.icon-fade-enter-from,
+.icon-fade-leave-to {
+  opacity: 0;
+  transform: scale(0.8);
+}
+
+/* ============ 响应式设计 ============ */
+@media (max-width: 768px) {
+  .chat-window {
+    width: 340px;
+    height: 520px;
+  }
+  
+  .chat-bubble {
+    max-width: 200px;
+    white-space: normal;
+  }
+}
 </style>
