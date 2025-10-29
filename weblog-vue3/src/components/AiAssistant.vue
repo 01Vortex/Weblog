@@ -57,8 +57,8 @@
               </div>
               <div :class="['message', msg.role === 'user' ? 'user-message' : 'assistant-message']">
                 <div class="message-content">
-                  <!-- 始终渲染 Markdown，打字中时显示光标 -->
-                  <span v-html="renderMarkdown(msg.content)"></span>
+                  <!-- 打字时用行内渲染（避免块级元素导致光标换行），完成后用完整渲染 -->
+                  <span v-html="renderMarkdown(msg.content, msg.isTyping)"></span>
                   <span v-if="msg.isTyping" class="typing-cursor">▋</span>
                 </div>
                 <div class="message-time" v-if="!msg.isTyping">{{ formatTime(msg.timestamp) }}</div>
@@ -131,8 +131,12 @@ const toggleAssistant = () => {
 }
 
 // 添加 Markdown 渲染函数
-const renderMarkdown = (content) => {
+const renderMarkdown = (content, isInline = false) => {
   if (!content) return ''
+  // 打字时使用行内渲染，避免块级元素导致光标换行
+  if (isInline) {
+    return marked.parseInline(content)
+  }
   return marked.parse(content)
 }
 
